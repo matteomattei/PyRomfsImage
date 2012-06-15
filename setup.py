@@ -4,11 +4,11 @@ from setuptools import setup,find_packages
 
 setup(
 	name='PyRomfsImage',
-	version='0.1a',
+	version='0.2',
 	description='ROMfs image parser',
 	long_description='This package provides a way to read ROMfs images header and to retrieve encapsulated binaries.',
-	author='Matteo Mattei; Nicola Ponzeveroni',
-	author_email='info@matteomattei.com; nicola.ponzeveroni@gilbarco.com',
+	author='Matteo Mattei; Nicola Ponzeveroni; Roberto Celeste',
+	author_email='info@matteomattei.com; nicola.ponzeveroni@gilbarco.com; roberto.celeste@gmail.com',
 	url='https://github.com/matteomattei/PyRomfsImage',
 	packages=find_packages(),
 	keywords = ["filesystem", "parser", "romfs"],
