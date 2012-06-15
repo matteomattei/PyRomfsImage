@@ -9,7 +9,10 @@ Copyright 2011 Matteo Mattei <matteo.mattei@gmail.com>; Nicola Ponzeveroni <nico
 It is intended to be used to access ROMFS filesystem data.
 Based on linux/romfs_fs.h
 """
+
 __all__ = ['RomfsNode','Romfs']
+
+import sys
 
 def __mkw(h,l): return ((ord(h)&0x00ff)<< 8|(ord(l)&0x00ff))
 def __mkl(h,l): return (((h)&0xffff)<<16|((l)&0xffff))
@@ -32,13 +35,31 @@ ROMFH_SCK=6
 ROMFH_FIF=7
 ROMFH_EXEC=8
 
+if sys.version_info[0] < 3:
+	hexZero = '\x00'
+	slash = "/"
+	void = ""
+	currentDir = "."
+	parentDir = ".."
+	pyVersionTwo = True
+else:
+	hexZero = b'\x00'
+	slash = b"/"
+	void = b""
+	currentDir = b"."
+	parentDir = b".."
+	pyVersionTwo = False
+
 class _Romfs_base:
 	""" ROMFS BASE CLASS """
 	def makeInteger(self,buf,start,lenght):
 		""" Assemble multibyte integer """
 		ret = 0
 		for i in range(start,start+lenght):
-			ret = ret*256+ord(buf[i])
+			if pyVersionTwo:
+				ret = ret*256+ord(buf[i])
+			else:
+				ret = ret*256+int(buf[i])
 		return ret
 
 class _Romfs_inode(_Romfs_base):
@@ -49,7 +70,7 @@ class _Romfs_inode(_Romfs_base):
 		self.spec     = self.makeInteger(buf, 4,4)
 		self.size     = self.makeInteger(buf, 8,4)
 		self.checksum = self.makeInteger(buf,12,4)
-		self.name     = buf[16:buf.find('\x00',16)]
+		self.name     = buf[16:buf.find(hexZero,16)]
 
 	def inode_dump(self,sys_stdout_like_object):
 		""" print informations about romfs inode. Only for debug. """
@@ -64,7 +85,7 @@ class Romfs_super_block(_Romfs_base):
 		self.word1    = self.makeInteger(buf, 4,4)
 		self.size     = self.makeInteger(buf, 8,4)
 		self.checksum = self.makeInteger(buf,12,4)
-		self.name     = buf[16:buf.find('\x00',16)]
+		self.name     = buf[16:buf.find(hexZero,16)]
 		self.start = (ROMFH_SIZE + len(self.name) + 1 + ROMFH_PAD) & ROMFH_MASK
 		self.stop  = (self.size)
 
@@ -83,7 +104,7 @@ class RomfsNode:
 	def __init__(self):
 		""" RomfsNode constructor: no parameters supplied. """
 		self.parent = None
-		self.name     = ""
+		self.name     = void
 		self.start    = 0
 		self.length   = 0
 		self.next     = 0
@@ -111,11 +132,11 @@ class RomfsNode:
 		Use the ROMFH_* constants. """
 		attr = (attr & ROMFH_TYPE)
 		return ((self.next & attr) == attr)
-		
-	def findAll(self,path=""):
+
+	def findAll(self,path=void):
 		""" Return a list of inode paths contained in the current inode. """
-		if not self.name=="":
-			path+=("/"+self.name)
+		if not self.name==void:
+			path+=(slash+self.name)
 		if self.isFolder():
 			ret = []
 			for c in self.children:
@@ -136,13 +157,13 @@ class RomfsNode:
 	def select(self,path):
 		""" Returns the inodes in the path specified.
 		The path must contain the current inode name. """
-		levels = path.split("/")
+		levels = path.split(slash)
 		return self.__selectl(levels, 0)
-	
+
 	def __selectl(self,levels,index):
 		""" Recursive implementation of select. Internal use. """
 		if len(levels)==index+1 and self.name == levels[index]:
-			 return self
+			return self
 		for c in self.children:
 			if c.name==levels[index+1]:
 				return c.__selectl(levels,index+1)
@@ -153,10 +174,10 @@ class RomfsNode:
 		buf = self.name
 		p = self.parent
 		while p != None :
-			if not p.name=="":
-				buf = p.name+"/"+buf
+			if not p.name==void:
+				buf = p.name + slash + buf
 			else:
-				buf = "/"+buf
+				buf = slash + buf
 			p = p.parent
 		return buf
 
@@ -213,7 +234,7 @@ class Romfs:
 			raise IOError("The file supplied is not a romfs image")
 		n = RomfsNode()
 		n.romfs = self
-		n.name=""
+		n.name = void
 		n.next = ROMFH_DIR
 		n.start = 0
 		n.length = b.size
@@ -237,7 +258,7 @@ class Romfs:
 			r.length = inode.size
 			r.start  = start
 			r.next   = inode.next
-			r.romfs = self
+			r.romfs  = self
 			header_end = start + ROMFH_SIZE + (len(inode.name) + 1 + ROMFH_PAD) & ROMFH_MASK
 			child_end  = inode.next & ROMFH_MASK
 			if child_end==0:
@@ -254,7 +275,7 @@ class Romfs:
 			else:
 				# unknown
 				pass
-			if r.name!="." and r.name!="..":
+			if r.name != currentDir and r.name != parentDir:
 				children.append( r )
 			start = r.next & ROMFH_MASK
 		return children
